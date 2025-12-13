@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WS2812 LED Visualizer Pro</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #bb86fc;
+            --border-color: #333;
+            --led-off: #333;
+            --led-size: 30px;
+            /* Default sized down slightly for larger grids */
+            --gap-size: 5px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-weight: 300;
+            color: var(--accent-color);
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        .editor-pane {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 350px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-row.wrap {
+            flex-wrap: wrap;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        input[type="number"] {
+            background: #2c2c2c;
+            border: 1px solid #444;
+            color: white;
+            padding: 4px;
+            width: 50px;
+            border-radius: 4px;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 40px;
+            height: 25px;
+            cursor: pointer;
+            background: none;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        input[type="range"] {
+            width: 100px;
+            accent-color: var(--accent-color);
+        }
+
+        select {
+            background: #2c2c2c;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background-color: #444;
+        }
+
+        button.primary {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            font-weight: bold;
+        }
+
+        button.danger {
+            background-color: #cf6679;
+            color: #000;
+            border: none;
+        }
+
+        /* The Viewport for the LEDs */
+        .preview-area {
+            background-color: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            overflow: auto;
+            max-width: 800px;
+            max-height: 800px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+            min-width: 300px;
+            position: relative;
+            /* For absolute positioning in Ring mode */
+        }
+
+        /* Matrix Mode Styles */
+        .grid-layout {
+            display: grid;
+            gap: var(--gap-size);
+            /* grid-template-columns set via JS */
+        }
+
+        /* Ring Mode Styles */
+        .ring-layout {
+            position: relative;
+            width: 400px;
+            height: 400px;
+        }
+
+        .led {
+            width: var(--led-size);
+            height: var(--led-size);
+            background-color: var(--led-off);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.8);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.2);
+            user-select: none;
+        }
+
+        .led:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            border: 1px solid #777;
+        }
+
+        /* For Ring Mode: LEDs are absolutely positioned */
+        .ring-layout .led {
+            position: absolute;
+            transform-origin: center center;
+        }
+
+        .led.active {
+            box-shadow: 0 0 8px currentColor;
+            color: rgba(0, 0, 0, 0.5);
+            /* Hide number slightly when lit */
+        }
+
+        .output-pane {
+            flex: 1;
+            min-width: 350px;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .output-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            flex: 1;
+            min-height: 400px;
+            background-color: #121212;
+            color: #8be9fd;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+            outline: none;
+            white-space: pre;
+        }
+
+        /* Utility for hidden elements */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>WS2812 Visualizer Pro</h1>
+
+    <div class="container">
+        <!-- LEFT: Controls & Preview -->
+        <div class="editor-pane">
+            <div class="controls">
+
+                <!-- settings row 1: Layout Mode -->
+                <div class="control-row">
+                    <label>Mode:</label>
+                    <select id="layoutMode">
+                        <option value="matrix">Matrix Grid</option>
+                        <option value="ring">Ring / Circle</option>
+                    </select>
+                    <button class="danger" id="clearBtn">Clear All</button>
+                    <button id="testCodeBtn">Gen Test Code</button>
+                </div>
+
+                <!-- settings row 2: Dimensions -->
+                <div class="control-row" id="matrixControls">
+                    <label>Rows:</label>
+                    <input type="number" id="rowsInput" value="8" min="1" max="32">
+                    <label>Cols:</label>
+                    <input type="number" id="colsInput" value="8" min="1" max="32">
+                </div>
+
+                <div class="control-row hidden" id="ringControls">
+                    <label>Total LEDs:</label>
+                    <input type="number" id="ringLedsInput" value="16" min="1" max="256">
+                </div>
+
+                <button id="applySizeBtn">Update Layout</button>
+
+                <!-- settings row 3: Paint Tools -->
+                <div class="control-row" style="margin-top: 10px; padding-top:10px; border-top: 1px solid #333">
+                    <label>Color:</label>
+                    <input type="color" id="colorPicker" value="#00d5ff">
+                    <label>Bright:</label>
+                    <input type="range" id="brightnessSlide" min="0" max="255" value="255">
+                    <span id="brightnessVal" style="font-family: monospace; font-size: 0.8rem;">255</span>
+                </div>
+            </div>
+
+            <div class="preview-area" id="previewArea">
+                <!-- Grid or Ring generated here -->
+                <div id="ledContainer" class="grid-layout"></div>
+            </div>
+            <div style="font-size: 0.8rem; color: #666; margin-top: 10px;">
+                Matrix: Serpentine (Zig-Zag) Indexing.<br>
+                Ring: Clockwise Indexing starting top (12 o'clock).
+            </div>
+        </div>
+
+        <!-- RIGHT: Code Output -->
+        <div class="output-pane">
+            <div class="output-toolbar">
+                <h2 style="font-size:1rem;color:#aaa;margin:0;flex:1;">Generated Code</h2>
+                <button class="primary" id="copyBtn">Copy Code</button>
+            </div>
+            <textarea id="codeOutput" readonly>// Code will appear here...</textarea>
+        </div>
+    </div>
+
+    <script>
+        // --- State ---
+        let currentMode = 'matrix'; // 'matrix' or 'ring'
+        let numRows = 8;
+        let numCols = 8;
+        let ringCount = 16;
+        let ledData = []; // Array of {r, g, b, brightness} or null
+
+        let selectedColor = "#00d5ff";
+        let paintBrightness = 255;
+
+        // --- DOM ---
+        const layoutModeSel = document.getElementById('layoutMode');
+        const matrixControls = document.getElementById('matrixControls');
+        const ringControls = document.getElementById('ringControls');
+        const rowsInput = document.getElementById('rowsInput');
+        const colsInput = document.getElementById('colsInput');
+        const ringLedsInput = document.getElementById('ringLedsInput');
+        const applySizeBtn = document.getElementById('applySizeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const testCodeBtn = document.getElementById('testCodeBtn');
+
+        const colorPicker = document.getElementById('colorPicker');
+        const brightnessSlide = document.getElementById('brightnessSlide');
+        const brightnessVal = document.getElementById('brightnessVal');
+
+        const previewArea = document.getElementById('previewArea');
+        const ledContainer = document.getElementById('ledContainer');
+        const codeOutput = document.getElementById('codeOutput');
+        const copyBtn = document.getElementById('copyBtn');
+
+        // --- Helpers ---
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.substring(1), 16);
+            return {
+                r: (bigint >> 16) & 255,
+                g: (bigint >> 8) & 255,
+                b: bigint & 255
+            };
+        }
+
+        // Serpentine Logic (Matrix)
+        function getMatrixIndex(row, col) {
+            // Even rows: L->R, Odd rows: R->L
+            if (row % 2 === 0) {
+                return row * numCols + col;
+            } else {
+                return row * numCols + (numCols - 1 - col);
+            }
+        }
+
+        // --- Core Logic ---
+
+        function initData() {
+            const total = currentMode === 'matrix' ? (numRows * numCols) : ringCount;
+            // Preserve existing data if possible? No, user changed size, simpler to reset or map?
+            // Requirement implies "select grid type", usually implies reset.
+            // Let's reset to avoid confusion.
+            ledData = new Array(total).fill(null);
+        }
+
+        function renderLayout() {
+            ledContainer.innerHTML = '';
+            ledContainer.className = currentMode === 'matrix' ? 'grid-layout' : 'ring-layout';
+
+            if (currentMode === 'matrix') {
+                // Set grid cols
+                ledContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+                ledContainer.style.width = 'auto';
+                ledContainer.style.height = 'auto';
+
+                for (let r = 0; r < numRows; r++) {
+                    for (let c = 0; c < numCols; c++) {
+                        const idx = getMatrixIndex(r, c);
+                        const led = createLedElement(idx);
+                        ledContainer.appendChild(led);
+                    }
+                }
+            } else {
+                // Ring
+                ledContainer.style.gridTemplateColumns = 'none';
+                const radius = 150; // px
+                const centerX = 200; // px center of 400x400 box
+                const centerY = 200;
+
+                for (let i = 0; i < ringCount; i++) {
+                    const led = createLedElement(i);
+                    // Position circularly
+                    // -90 deg to start top (12 o'clock)
+                    const angleDeg = (i / ringCount) * 360 - 90;
+                    const angleRad = angleDeg * (Math.PI / 180);
+
+                    const top = centerY + radius * Math.sin(angleRad) - 15; // 15 is half led size
+                    const left = centerX + radius * Math.cos(angleRad) - 15;
+
+                    led.style.top = `${top}px`;
+                    led.style.left = `${left}px`;
+
+                    ledContainer.appendChild(led);
+                }
+            }
+            generateCode();
+        }
+
+        function createLedElement(index) {
+            const div = document.createElement('div');
+            div.classList.add('led');
+            div.dataset.index = index;
+            div.innerText = index; // Show index for debugging/reference
+
+            // Check state
+            if (ledData[index]) {
+                applyVisuals(div, ledData[index]);
+            }
+
+            div.addEventListener('click', () => toggleLed(index, div));
+            return div;
+        }
+
+        function toggleLed(index, el) {
+            if (ledData[index]) {
+                ledData[index] = null;
+                el.style.backgroundColor = 'var(--led-off)';
+                el.style.boxShadow = 'none';
+                el.style.color = 'rgba(255,255,255,0.2)';
+                el.classList.remove('active');
+            } else {
+                const rgb = hexToRgb(selectedColor);
+                ledData[index] = { ...rgb, brightness: paintBrightness };
+                applyVisuals(el, ledData[index]);
+            }
+            generateCode();
+        }
+
+        function applyVisuals(el, data) {
+            const factor = data.brightness / 255;
+            const r = Math.round(data.r * factor);
+            const g = Math.round(data.g * factor);
+            const b = Math.round(data.b * factor);
+            el.style.backgroundColor = `rgb(${r},${g},${b})`;
+            el.style.color = `rgb(${r},${g},${b})`; // Shadow color
+            el.classList.add('active');
+        }
+
+        function generateCode() {
+            let code = `// FastLED Configuration\n`;
+            code += `#define NUM_LEDS ${ledData.length}\n`;
+            code += `CRGB leds[NUM_LEDS];\n\n`;
+            code += `void setup() { \n  FastLED.addLeds<WS2812, PIN, GRB>(leds, NUM_LEDS);\n}\n\n`;
+            code += `void loop() {\n  // Generated Pattern\n  FastLED.clear();\n\n`;
+
+            let hasLeds = false;
+            for (let i = 0; i < ledData.length; i++) {
+                if (ledData[i]) {
+                    const d = ledData[i];
+                    // Apply brightness to values
+                    const f = d.brightness / 255;
+                    const r = Math.round(d.r * f);
+                    const g = Math.round(d.g * f);
+                    const b = Math.round(d.b * f);
+                    code += `  leds[${i}] = CRGB(${r}, ${g}, ${b});\n`;
+                    hasLeds = true;
+                }
+            }
+
+            if (!hasLeds) code += `  // No LEDs active\n`;
+
+            code += `\n  FastLED.show();\n  delay(100);\n}`;
+            codeOutput.value = code;
+        }
+
+        function generateTestPattern() {
+            const count = ledData.length;
+            let code = `/* \n  Test Pattern Generator \n  Cycles R, G, B, and White to test all LEDs.\n*/\n\n`;
+            code += `#define NUM_LEDS ${count}\nCRGB leds[NUM_LEDS];\n\n`;
+            code += `void setup() { FastLED.addLeds<WS2812, 6, GRB>(leds, NUM_LEDS); }\n\n`;
+            code += `void loop() {\n`;
+            code += `  // Red\n  fill_solid(leds, NUM_LEDS, CRGB::Red); FastLED.show(); delay(1000);\n`;
+            code += `  // Green\n  fill_solid(leds, NUM_LEDS, CRGB::Green); FastLED.show(); delay(1000);\n`;
+            code += `  // Blue\n  fill_solid(leds, NUM_LEDS, CRGB::Blue); FastLED.show(); delay(1000);\n`;
+            code += `  // White (All On)\n  fill_solid(leds, NUM_LEDS, CRGB::White); FastLED.show(); delay(1000);\n`;
+            code += `  // Off\n  FastLED.clear(); FastLED.show(); delay(500);\n`;
+            code += `}`;
+
+            codeOutput.value = code;
+        }
+
+        // --- Event Listeners ---
+        layoutModeSel.addEventListener('change', () => {
+            currentMode = layoutModeSel.value;
+            if (currentMode === 'matrix') {
+                matrixControls.classList.remove('hidden');
+                ringControls.classList.add('hidden');
+            } else {
+                matrixControls.classList.add('hidden');
+                ringControls.classList.remove('hidden');
+            }
+        });
+
+        applySizeBtn.addEventListener('click', () => {
+            numRows = parseInt(rowsInput.value) || 8;
+            numCols = parseInt(colsInput.value) || 8;
+            ringCount = parseInt(ringLedsInput.value) || 16;
+
+            initData();
+            renderLayout();
+        });
+
+        clearBtn.addEventListener('click', () => {
+            ledData.fill(null);
+            renderLayout(); // Re-render strips styles
+        });
+
+        testCodeBtn.addEventListener('click', generateTestPattern);
+
+        colorPicker.addEventListener('input', (e) => selectedColor = e.target.value);
+        brightnessSlide.addEventListener('input', (e) => {
+            paintBrightness = parseInt(e.target.value);
+            brightnessVal.innerText = paintBrightness;
+        });
+
+        copyBtn.addEventListener('click', () => {
+            codeOutput.select();
+            document.execCommand('copy');
+            const t = copyBtn.innerText;
+            copyBtn.innerText = "Copied!";
+            setTimeout(() => copyBtn.innerText = t, 1000);
+        });
+
+        // Init
+        initData();
+        renderLayout();
+
+    </script>
+</body>
+
+</html>
