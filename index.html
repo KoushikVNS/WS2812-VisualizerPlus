@@ -362,15 +362,11 @@
             };
         }
 
-        // Serpentine Logic (Matrix)
-        function getMatrixIndex(row, col) {
-            // Even rows: L->R, Odd rows: R->L
-            if (row % 2 === 0) {
-                return row * numCols + col;
-            } else {
-                return row * numCols + (numCols - 1 - col);
-            }
-        }
+      // LINEAR row-wise indexing
+function getMatrixIndex(row, col) {
+    return row * numCols + col;
+}
+
 
         // --- Core Logic ---
 
@@ -556,5 +552,6 @@
 
     </script>
 </body>
+
 
 </html>
